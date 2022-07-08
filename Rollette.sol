@@ -80,7 +80,7 @@ contract Rollette {
         return randomNumber & participants.length;
     }
 
-    function withdraw() public onlyOwner isCampaignStarted {
+    function withdraw() public onlyOwner withdrawOnFinishedCampaign {
         (bool callSuccess, ) = payable(msg.sender).call{
             value: address(this).balance
         }("");
@@ -122,7 +122,7 @@ contract Rollette {
         _;
     }
 
-    modifier isCampaignStarted() {
+    modifier withdrawOnFinishedCampaign() {
         if (participants.length > 0) {
             revert CampaingStarted();
         }
