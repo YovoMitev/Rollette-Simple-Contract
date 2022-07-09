@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: MIT
 
 pragma solidity 0.8.15;
+import "@openzeppelin/contracts/utils/Strings.sol";
 
 error NotOwner();
-error CampaingStarted();
+error CampaignIsOngoing();
 
 contract Rollette {
     uint public rolletteRounds;
@@ -11,13 +12,21 @@ contract Rollette {
     address[] public participants;
     // addresses and the amount of EHT for the participants.
     mapping(address => uint256) public participantsAddressToAmount;
-    // The deposit is exact 0.01 eth.
-    uint public constant DEPOSITION_ETHERS = 0.01 * 10**18;
+    // The deposit is exact 0.01 eth by default.
+    uint public DEPOSITION_ETHERS_IN_WEI = 0.01 * 10**18;
     // After each spin, the contract gets 5% commission.
     uint public constant COMMISSION_PERCENTAGE = 5;
 
     constructor() {
         i_owner = msg.sender;
+    }
+
+    function setDepositValue(uint depositValueWei)
+        public
+        onlyOwner
+        performAfterFinishedCampaing
+    {
+        DEPOSITION_ETHERS_IN_WEI = depositValueWei;
     }
 
     function getThePrize() public view returns (uint256) {
@@ -51,9 +60,10 @@ contract Rollette {
     }
 
     function addFunds() public payable {
+        string memory weiToString = Strings.toString(DEPOSITION_ETHERS_IN_WEI);
         require(
-            msg.value == DEPOSITION_ETHERS,
-            "Invalid deposit, please send 0.01 ETH!"
+            msg.value == DEPOSITION_ETHERS_IN_WEI,
+            string.concat("Invalid deposit, please send ", weiToString, " Wei!")
         );
         // One participant can deposit only one time for rolletter round.
         require(
@@ -80,7 +90,7 @@ contract Rollette {
         return randomNumber & participants.length;
     }
 
-    function withdraw() public onlyOwner withdrawOnFinishedCampaign {
+    function withdraw() public onlyOwner performAfterFinishedCampaing {
         (bool callSuccess, ) = payable(msg.sender).call{
             value: address(this).balance
         }("");
@@ -119,6 +129,10 @@ contract Rollette {
         addFunds();
     }
 
+    fallback() external payable {
+        addFunds();
+    }
+
     modifier onlyOwner() {
         if (msg.sender != i_owner) {
             revert NotOwner();
@@ -126,9 +140,9 @@ contract Rollette {
         _;
     }
 
-    modifier withdrawOnFinishedCampaign() {
+    modifier performAfterFinishedCampaing() {
         if (participants.length > 0) {
-            revert CampaingStarted();
+            revert CampaignIsOngoing();
         }
         _;
     }
